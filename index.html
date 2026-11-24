@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>오늘 뭐 먹지?</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="뭐 먹지">
+<meta name="theme-color" content="#e8743b">
+<style>
+  :root { --bg:#fff8f0; --card:#fff; --ink:#3a2e26; --sub:#8a7566; --accent:#e8743b; --soft:#fde6d6; --line:#f0dfd2; --ok:#4f9a5b; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font: 18px/1.5 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  header { display:flex; align-items:center; justify-content:space-between; padding:16px 16px 4px; }
+  header h1 { font-size:24px; margin:0; }
+  main { padding: 8px 16px; max-width: 640px; margin: 0 auto; }
+  h2 { font-size:22px; margin:20px 0 10px; }
+  button { font: inherit; cursor: pointer; border-radius: 14px; border: 2px solid var(--line); background: var(--card); color: var(--ink); min-height: 52px; padding: 8px 16px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  button.pick { border-color: var(--line); }
+  button.pick.on { border-color: var(--accent); background: var(--soft); font-weight: 700; }
+  button.icon { min-height: 48px; min-width: 48px; padding: 0; font-size: 26px; border: none; background: none; }
+  a.btn { display:inline-flex; align-items:center; justify-content:center; min-height:52px; padding:8px 16px; border-radius:14px; background:var(--accent); color:#fff; font-weight:700; text-decoration:none; }
+  .card { background: var(--card); border-radius: 20px; padding: 18px; margin: 12px 0; box-shadow: 0 2px 8px rgba(120,70,30,.08); }
+  .meal-label { color: var(--accent); font-weight: 700; font-size: 18px; }
+  .menu { font-size: 26px; font-weight: 800; margin: 4px 0; }
+  .muted { color: var(--sub); font-size: 17px; }
+  .note { background: #fff3c8; border-radius: 12px; padding: 10px 12px; margin: 10px 0; font-size: 17px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px; }
+  .row > * { flex: 1 1 auto; }
+  .sides { margin: 8px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--bg); font-size: 17px; }
+  .sides a { color: var(--accent); }
+  .empty { text-align:center; padding: 40px 16px; }
+  .empty .big { font-size: 48px; }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(4,1fr); background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { border: none; border-radius: 0; min-height: 72px; font-size: 17px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:none; color: var(--sub); }
+  nav button span { font-size: 26px; }
+  nav button.on { color: var(--accent); font-weight: 800; }
+  table { width:100%; border-collapse: collapse; }
+  .week-day { padding: 12px; }
+  .week-day.today { outline: 3px solid var(--accent); }
+  .week-day .d { font-weight: 800; margin-bottom: 6px; }
+  .week-day button { width: 100%; text-align: left; margin: 4px 0; min-height: 48px; }
+  .week-day button b { color: var(--accent); margin-right: 8px; }
+  .item { display:flex; align-items:center; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .item input { width: 30px; height: 30px; accent-color: var(--accent); flex: none; }
+  .item.done .nm { text-decoration: line-through; color: var(--sub); }
+  .item .nm { flex: 1; }
+  .item .by { font-size: 15px; color: var(--sub); white-space: nowrap; }
+  input[type=text], input[type=date], input[type=number], textarea { font: inherit; width: 100%; padding: 12px; border: 2px solid var(--line); border-radius: 12px; background: #fff; }
+  label.f { display:block; font-weight:700; margin: 14px 0 6px; }
+  .log { display:flex; justify-content:space-between; gap:8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  dialog { border: none; border-radius: 20px; padding: 20px; width: min(92vw, 560px); max-height: 85vh; }
+  dialog::backdrop { background: rgba(40,20,10,.45); }
+  ul { padding-left: 22px; margin: 6px 0; }
+  .toast { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 30px; display:none; z-index: 10; }
+</style>
+</head>
+<body>
+<header><h1 id="title">오늘 뭐 먹지?</h1><button class="icon" id="gear" aria-label="우리 가족 설정">⚙️</button></header>
+<main id="app"><p class="muted">불러오는 중…</p></main>
+<nav id="nav" hidden>
+  <button data-tab="today"><span>🍚</span>오늘</button>
+  <button data-tab="week"><span>📅</span>이번 주</button>
+  <button data-tab="log"><span>✏️</span>기록</button>
+  <button data-tab="shop"><span>🛒</span>장보기</button>
+</nav>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { getFirestore, doc, collection, onSnapshot, setDoc, updateDoc, addDoc, deleteDoc, getDoc, query, orderBy, limit, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { firebaseConfig } from "./config.js";
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const safeUrl = (u) => (/^https?:\/\//.test(u || "") ? u : "");
+const MEALS = [["breakfast", "아침"], ["lunch", "점심"], ["dinner", "저녁"]];
+const MEAL_KO = Object.fromEntries(MEALS);
+const CATS = ["채소", "육류·해산물", "유제품", "가공식품", "양념"];
+const RATE = { good: "😋 좋음", soso: "😐 보통", bad: "🙅 별로" };
+const DEFAULT_SETTINGS = {
+  members: [{ name: "아빠", age: 45 }, { name: "엄마", age: 45 }, { name: "아들", age: 12 }, { name: "딸", age: null }],
+  noSpicy: true, allergies: "", dislikes: "", likes: "",
+  cookTime: "아침 15분 이내, 평일 저녁 30분 이내, 주말은 여유",
+};
+
+// 날짜는 모두 한국 시간 기준 YYYY-MM-DD 문자열로 다룬다.
+const todayStr = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+const addDays = (s, n) => { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const weekStartOf = (s) => addDays(s, -((new Date(s + "T00:00:00Z").getUTCDay() + 1) % 7)); // 토요일 시작
+const fmt = (s) => { const d = new Date(s + "T00:00:00Z"); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${"일월화수목금토"[d.getUTCDay()]})`; };
+
+// 가족 코드: 링크의 ?f= 로 받아 기기에 기억한다.
+const urlCode = new URLSearchParams(location.search).get("f");
+if (urlCode) { localStorage.setItem("family", urlCode); history.replaceState(null, "", location.pathname); }
+const FAMILY = localStorage.getItem("family");
+
+const state = { tab: "today", plan: null, planLoaded: false, nextPlan: null, settings: DEFAULT_SETTINGS, logs: [] };
+let db, planRef;
+
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), 2000); }
+const fail = (e) => { console.error(e); toast("저장에 실패했어요. 인터넷 연결을 확인해 주세요."); };
+
+if (!FAMILY) {
+  $("#app").innerHTML = `<div class="card empty"><div class="big">🔑</div>
+    <p>가족에게 받은 <b>접속 링크</b>로 들어와 주세요.<br>또는 가족 코드를 입력하세요.</p>
+    <input type="text" id="code" placeholder="가족 코드"><div class="row"><button class="primary" id="go">들어가기</button></div></div>`;
+  $("#go").onclick = () => { const c = $("#code").value.trim(); if (c) { localStorage.setItem("family", c); location.reload(); } };
+} else {
+  start();
+}
+
+function start() {
+  db = getFirestore(initializeApp(firebaseConfig));
+  const fam = (...p) => doc(db, "families", FAMILY, ...p);
+  const ws = weekStartOf(todayStr());
+  planRef = fam("plans", ws);
+  state.famDoc = fam;
+  onSnapshot(planRef, (s) => { state.plan = s.exists() ? s.data() : null; state.planLoaded = true; render(); }, (e) => { state.planLoaded = true; console.error(e); render(); });
+  onSnapshot(fam("plans", addDays(ws, 7)), (s) => { state.nextPlan = s.exists() ? s.data() : null; render(); });
+  onSnapshot(fam("settings", "main"), (s) => { state.settings = s.exists() ? { ...DEFAULT_SETTINGS, ...s.data() } : DEFAULT_SETTINGS; render(); });
+  onSnapshot(query(collection(db, "families", FAMILY, "logs"), orderBy("date", "desc"), limit(40)), (s) => { state.logs = s.docs.map((d) => ({ id: d.id, ...d.data() })); render(); });
+  $("#nav").hidden = false;
+  document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => { state.tab = b.dataset.tab; render(); scrollTo(0, 0); }));
+  $("#gear").onclick = () => { state.tab = "settings"; render(); scrollTo(0, 0); };
+}
+
+// 끼니의 선택지 = [원래 메뉴, ...대체 메뉴]; swaps 에 고른 번호를 저장한다.
+function mealOf(plan, date, meal) {
+  const day = plan?.days?.find((d) => d.date === date);
+  const base = day?.[meal];
+  if (!base) return null;
+  const options = [base, ...(base.alternatives || [])];
+  const idx = Math.min(plan.swaps?.[`${date}_${meal}`] || 0, options.length - 1);
+  return { ...options[idx], sides: base.sides, options, idx };
+}
+const planFor = (date) => (weekStartOf(date) === weekStartOf(todayStr()) ? state.plan : state.nextPlan);
+
+function render() {
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
+  if (!state.planLoaded) return;
+  const view = { today: viewToday, week: viewWeek, log: viewLog, shop: viewShop, settings: viewSettings }[state.tab];
+  // 입력 중인 폼은 실시간 갱신으로 지우지 않는다.
+  if ((state.tab === "log" || state.tab === "settings") && $("#app").dataset.tab === state.tab) return;
+  $("#app").dataset.tab = state.tab;
+  $("#app").innerHTML = view();
+  bind();
+}
+
+const noPlan = () => `<div class="card empty"><div class="big">🍽️</div><p><b>이번 주 식단이 아직 없어요</b></p>
+  <p class="muted">토요일 아침 8시에 자동으로 만들어져요.<br>계속 비어 있으면 식단 관리자에게 알려 주세요.</p></div>`;
+
+function mealCard(date, meal, big) {
+  const m = mealOf(planFor(date), date, meal);
+  if (!m) return `<div class="card"><div class="meal-label">${MEAL_KO[meal]}</div><p class="muted">계획 없음</p></div>`;
+  const url = safeUrl(m.recipeUrl);
+  const sides = (m.sides || []).map((s) => (safeUrl(s.recipeUrl) ? `<a href="${esc(s.recipeUrl)}" target="_blank" rel="noopener">${esc(s.name)}</a>` : esc(s.name))).join(", ");
+  return `<div class="card">
+    <div class="meal-label">${MEAL_KO[meal]}${m.minutes ? ` · ${esc(m.minutes)}분` : ""}</div>
+    <div class="menu">${esc(m.name)}</div>
+    ${m.note ? `<div class="note">💡 ${esc(m.note)}</div>` : ""}
+    ${sides ? `<div class="sides">반찬 (여유 있을 때): ${sides}</div>` : ""}
+    ${big ? `<div class="row">
+      ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">📖 레시피 보기</a>` : ""}
+      <button data-detail="${date}|${meal}">🥕 재료</button>
+      ${m.options.length > 1 ? `<button data-swap="${date}|${meal}">🔄 이거 말고 다른 거</button>` : ""}
+      <button data-ate="${date}|${meal}">✅ 계획대로 먹음</button></div>`
+    : `<div class="row"><button data-detail="${date}|${meal}">자세히</button></div>`}
+  </div>`;
+}
+
+function viewToday() {
+  $("#title").textContent = "오늘 뭐 먹지?";
+  const t = todayStr(), tm = addDays(t, 1);
+  if (!state.plan) return noPlan();
+  const tomorrow = planFor(tm)
+    ? MEALS.map(([k, ko]) => { const m = mealOf(planFor(tm), tm, k); return `<div><b class="meal-label">${ko}</b> ${esc(m?.name || "-")}</div>`; }).join("")
+    : `<p class="muted">다음 주 식단은 토요일 아침에 나와요.</p>`;
+  return `<p class="muted">${fmt(t)}</p>${MEALS.map(([k]) => mealCard(t, k, true)).join("")}
+    <h2>내일 ${fmt(tm)}</h2><div class="card">${tomorrow}</div>`;
+}
+
+function viewWeek() {
+  $("#title").textContent = "이번 주 식단";
+  if (!state.plan) return noPlan();
+  const t = todayStr();
+  return state.plan.days.map((d) => `<div class="card week-day ${d.date === t ? "today" : ""}">
+    <div class="d">${fmt(d.date)}${d.date === t ? " · 오늘" : ""}</div>
+    ${MEALS.map(([k, ko]) => `<button data-detail="${d.date}|${k}"><b>${ko}</b>${esc(mealOf(state.plan, d.date, k)?.name || "-")}</button>`).join("")}
+  </div>`).join("");
+}
+
+function viewShop() {
+  $("#title").textContent = "장보기";
+  if (!state.plan) return noPlan();
+  const items = state.plan.shopping || [], checked = state.plan.checked || {};
+  const row = (it) => `<label class="item ${checked[it.id] ? "done" : ""}">
+    <input type="checkbox" data-check="${esc(it.id)}" ${checked[it.id] ? "checked" : ""}>
+    <span class="nm">${esc(it.name)} <span class="muted">${esc(it.amount || "")}</span></span>
+    ${it.neededBy ? `<span class="by">${fmt(it.neededBy)}까지</span>` : ""}</label>`;
+  const sorted = (list) => list.slice().sort((a, b) => (a.neededBy || "").localeCompare(b.neededBy || ""));
+  const buy = items.filter((i) => !i.pantry), pantry = items.filter((i) => i.pantry);
+  const left = buy.filter((i) => !checked[i.id]).length;
+  return `<p class="muted">4인분 기준 · 남은 것 ${left}개 · 가족 모두에게 같이 보여요</p>
+    ${CATS.map((c) => { const l = buy.filter((i) => (CATS.includes(i.category) ? i.category : "가공식품") === c); return l.length ? `<div class="card"><h2 style="margin-top:0">${c}</h2>${sorted(l).map(row).join("")}</div>` : ""; }).join("")}
+    ${pantry.length ? `<div class="card"><h2 style="margin-top:0">집에 있는지 확인할 기본 양념</h2>${sorted(pantry).map(row).join("")}</div>` : ""}`;
+}
+
+function viewLog() {
+  $("#title").textContent = "먹은 메뉴 기록";
+  const me = localStorage.getItem("me") || "";
+  const t = todayStr();
+  return `<div class="card">
+    <label class="f">날짜</label><input type="date" id="lg-date" value="${t}">
+    <label class="f">끼니</label><div class="row" data-group="meal">${MEALS.map(([k, ko]) => `<button class="pick" data-v="${k}">${ko}</button>`).join("")}</div>
+    <label class="f">어떻게 먹었나요?</label><div class="row" data-group="kind">${["집밥", "외식", "배달"].map((k, i) => `<button class="pick ${i ? "" : "on"}" data-v="${k}">${k}</button>`).join("")}</div>
+    <label class="f">메뉴</label><input type="text" id="lg-menu" placeholder="예: 간장 불고기">
+    <label class="f">맛은 어땠나요?</label><div class="row" data-group="rating">${Object.entries(RATE).map(([k, v]) => `<button class="pick" data-v="${k}">${v}</button>`).join("")}</div>
+    <label class="f">누가 적나요?</label><div class="row" data-group="writer">${state.settings.members.map((m) => `<button class="pick ${m.name === me ? "on" : ""}" data-v="${esc(m.name)}">${esc(m.name)}</button>`).join("")}</div>
+    <div class="row" style="margin-top:20px"><button class="primary" id="lg-save">기록하기</button></div>
+  </div>
+  <h2>최근 기록</h2><div class="card">${state.logs.length ? state.logs.map((l) => `<div class="log">
+    <div><b>${esc(l.menu)}</b>${l.kind && l.kind !== "집밥" ? ` <span class="muted">(${esc(l.kind)})</span>` : ""}<br>
+    <span class="muted">${fmt(l.date)} ${MEAL_KO[l.meal] || ""} · ${esc(l.writer || "")}${l.planned ? " · 계획대로" : ""}</span></div>
+    <div style="display:flex;align-items:center;gap:4px">${l.rating ? RATE[l.rating].split(" ")[0] : ""}<button class="icon" data-del="${l.id}" aria-label="삭제">🗑️</button></div></div>`).join("") : `<p class="muted">아직 기록이 없어요.</p>`}</div>`;
+}
+
+function viewSettings() {
+  $("#title").textContent = "우리 가족 설정";
+  const s = state.settings;
+  return `<div class="card">
+    <label class="f">가족 구성 (이름 · 나이)</label>
+    ${s.members.map((m, i) => `<div class="row"><input type="text" data-mname="${i}" value="${esc(m.name)}" style="flex:2"><input type="number" data-mage="${i}" value="${m.age ?? ""}" placeholder="나이" style="flex:1"></div>`).join("")}
+    <label class="f" style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="st-spicy" style="width:28px;height:28px" ${s.noSpicy ? "checked" : ""}> 매운 음식 못 먹음</label>
+    <label class="f">알레르기 · 절대 못 먹는 음식</label><textarea id="st-allergies" rows="2" placeholder="없으면 비워 두세요">${esc(s.allergies)}</textarea>
+    <label class="f">싫어하는 음식</label><textarea id="st-dislikes" rows="2" placeholder="예: 아들은 가지를 싫어함">${esc(s.dislikes)}</textarea>
+    <label class="f">좋아하는 음식</label><textarea id="st-likes" rows="2" placeholder="예: 딸은 계란말이를 좋아함">${esc(s.likes)}</textarea>
+    <label class="f">선호 조리시간</label><textarea id="st-cook" rows="2">${esc(s.cookTime)}</textarea>
+    <div class="row" style="margin-top:20px"><button class="primary" id="st-save">저장</button></div>
+  </div>
+  <p class="muted">바꾼 내용은 다음 주 식단부터 반영돼요.</p>`;
+}
+
+function showDetail(date, meal) {
+  const m = mealOf(planFor(date), date, meal);
+  if (!m) return;
+  const url = safeUrl(m.recipeUrl);
+  $("#dlg").innerHTML = `<div class="meal-label">${fmt(date)} ${MEAL_KO[meal]}${m.minutes ? ` · ${esc(m.minutes)}분` : ""}</div>
+    <div class="menu">${esc(m.name)}</div>
+    ${m.note ? `<div class="note">💡 ${esc(m.note)}</div>` : ""}
+    <h2>재료 (4인분)</h2><ul>${(m.ingredients || []).map((i) => `<li>${esc(i)}</li>`).join("") || "<li>정보 없음</li>"}</ul>
+    ${(m.sides || []).length ? `<h2>추천 반찬 (선택)</h2><ul>${m.sides.map((s) => `<li>${safeUrl(s.recipeUrl) ? `<a href="${esc(s.recipeUrl)}" target="_blank" rel="noopener">${esc(s.name)}</a>` : esc(s.name)}${s.note ? ` <span class="muted">— ${esc(s.note)}</span>` : ""}</li>`).join("")}</ul>` : ""}
+    <div class="row" style="margin-top:16px">${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">📖 레시피 보기</a>` : ""}<button onclick="this.closest('dialog').close()">닫기</button></div>`;
+  $("#dlg").showModal();
+}
+
+function showSwap(date, meal) {
+  const m = mealOf(state.plan, date, meal);
+  $("#dlg").innerHTML = `<h2 style="margin-top:0">${MEAL_KO[meal]} 메뉴 바꾸기</h2>
+    ${m.options.map((o, i) => `<button class="pick ${i === m.idx ? "on" : ""}" data-pick="${i}" style="width:100%;text-align:left;margin:6px 0">
+      <b>${esc(o.name)}</b>${i === 0 ? " <span class='muted'>(원래 계획)</span>" : ""}${o.minutes ? ` <span class="muted">· ${esc(o.minutes)}분</span>` : ""}
+      ${o.note ? `<br><span class="muted">${esc(o.note)}</span>` : ""}</button>`).join("")}
+    <div class="row"><button onclick="this.closest('dialog').close()">닫기</button></div>`;
+  $("#dlg").querySelectorAll("[data-pick]").forEach((b) => (b.onclick = () => {
+    updateDoc(planRef, { [`swaps.${date}_${meal}`]: Number(b.dataset.pick) }).then(() => toast("메뉴를 바꿨어요")).catch(fail);
+    $("#dlg").close();
+  }));
+  $("#dlg").showModal();
+}
+
+function askWho() {
+  return new Promise((resolve) => {
+    $("#dlg").innerHTML = `<h2 style="margin-top:0">누가 기록하나요?</h2><div class="row">${state.settings.members.map((m) => `<button class="pick" data-who="${esc(m.name)}">${esc(m.name)}</button>`).join("")}</div>`;
+    $("#dlg").querySelectorAll("[data-who]").forEach((b) => (b.onclick = () => { localStorage.setItem("me", b.dataset.who); $("#dlg").close(); resolve(b.dataset.who); }));
+    $("#dlg").showModal();
+  });
+}
+
+function bind() {
+  const app = $("#app");
+  app.querySelectorAll("[data-detail]").forEach((b) => (b.onclick = () => showDetail(...b.dataset.detail.split("|"))));
+  app.querySelectorAll("[data-swap]").forEach((b) => (b.onclick = () => showSwap(...b.dataset.swap.split("|"))));
+  app.querySelectorAll("[data-ate]").forEach((b) => (b.onclick = async () => {
+    const [date, meal] = b.dataset.ate.split("|");
+    const writer = localStorage.getItem("me") || (await askWho());
+    const m = mealOf(state.plan, date, meal);
+    addDoc(collection(db, "families", FAMILY, "logs"), { date, meal, menu: m.name, kind: "집밥", rating: null, writer, planned: true, createdAt: serverTimestamp() })
+      .then(() => toast(`기록했어요 (${writer}) · 맛 평가는 '기록' 탭에서`)).catch(fail);
+  }));
+  app.querySelectorAll("[data-check]").forEach((c) => (c.onchange = () => updateDoc(planRef, { [`checked.${c.dataset.check}`]: c.checked }).catch(fail)));
+  app.querySelectorAll("[data-group] .pick").forEach((b) => (b.onclick = () => {
+    b.parentElement.querySelectorAll(".pick").forEach((x) => x.classList.toggle("on", x === b));
+    if (b.parentElement.dataset.group === "meal") {
+      const m = mealOf(planFor($("#lg-date").value), $("#lg-date").value, b.dataset.v);
+      if (m && !$("#lg-menu").value) $("#lg-menu").value = m.name;
+    }
+  }));
+  app.querySelectorAll("[data-del]").forEach((b) => (b.onclick = () => { if (confirm("이 기록을 지울까요?")) deleteDoc(doc(db, "families", FAMILY, "logs", b.dataset.del)).then(() => { app.dataset.tab = ""; render(); }).catch(fail); }));
+  const pick = (g) => app.querySelector(`[data-group=${g}] .on`)?.dataset.v || null;
+  if ($("#lg-save")) $("#lg-save").onclick = () => {
+    const rec = { date: $("#lg-date").value, meal: pick("meal"), kind: pick("kind"), menu: $("#lg-menu").value.trim(), rating: pick("rating"), writer: pick("writer") };
+    if (!rec.date || !rec.meal || !rec.menu || !rec.writer) return toast("날짜·끼니·메뉴·작성자를 골라 주세요");
+    const m = mealOf(planFor(rec.date), rec.date, rec.meal);
+    localStorage.setItem("me", rec.writer);
+    addDoc(collection(db, "families", FAMILY, "logs"), { ...rec, planned: rec.kind === "집밥" && m?.name === rec.menu, createdAt: serverTimestamp() })
+      .then(() => { toast("기록했어요"); app.dataset.tab = ""; render(); }).catch(fail);
+  };
+  if ($("#st-save")) $("#st-save").onclick = () => {
+    const members = state.settings.members.map((_, i) => ({ name: app.querySelector(`[data-mname="${i}"]`).value.trim(), age: Number(app.querySelector(`[data-mage="${i}"]`).value) || null })).filter((m) => m.name);
+    setDoc(state.famDoc("settings", "main"), { members, noSpicy: $("#st-spicy").checked, allergies: $("#st-allergies").value.trim(), dislikes: $("#st-dislikes").value.trim(), likes: $("#st-likes").value.trim(), cookTime: $("#st-cook").value.trim() })
+      .then(() => { toast("저장했어요"); state.tab = "today"; render(); }).catch(fail);
+  };
+}
+</script>
+</body>
+</html>
