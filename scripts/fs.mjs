@@ -77,9 +77,9 @@ if (cmd === "init") {
   console.log("OK");
 } else if (cmd === "dump") {
   const thisWeek = weekStartOf(todayKST());
-  // 토요일 실행이면 오늘 시작하는 주, 그 외엔 이번 주가 비었으면 이번 주 / 있으면 다음 주를 짠다.
-  // 인자로 주 시작일(토요일)을 주면 그 주를 다시 짠다.
-  const target = arg || ((await getDoc(`plans/${thisWeek}`)) ? addDays(thisWeek, 7) : thisWeek);
+  // 인자로 주 시작일을 주면 그 주. 토요일(예약 실행)이면 오늘 시작하는 주(미리 짜 둔 게 있어도 새로 짬).
+  // 그 외 요일엔 이번 주가 비었으면 이번 주, 있으면 다음 주.
+  const target = arg || (thisWeek === todayKST() || !(await getDoc(`plans/${thisWeek}`)) ? thisWeek : addDays(thisWeek, 7));
   const h = await history(target);
   console.log(JSON.stringify({ today: todayKST(), targetWeekStart: target, settings: await getDoc("settings/main"), ...h }, null, 1));
 } else if (cmd === "put") {
