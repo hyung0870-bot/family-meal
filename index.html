@@ -97,8 +97,10 @@ const fmt = (s) => { const d = new Date(s + "T00:00:00Z"); return `${d.getUTCMon
 
 // 가족 코드: 링크의 ?f= 로 받아 기기에 기억한다.
 const urlCode = new URLSearchParams(location.search).get("f");
-if (urlCode) { localStorage.setItem("family", urlCode); history.replaceState(null, "", location.pathname); }
+if (urlCode) localStorage.setItem("family", urlCode);
 const FAMILY = localStorage.getItem("family");
+// 홈 화면 앱은 브라우저와 저장소가 따로라서, 주소에 코드를 남겨 홈 화면에 추가할 때 함께 저장되게 한다.
+if (FAMILY && urlCode !== FAMILY) history.replaceState(null, "", `?f=${encodeURIComponent(FAMILY)}`);
 
 const state = { tab: "today", plan: null, planLoaded: false, nextPlan: null, settings: DEFAULT_SETTINGS, logs: [] };
 let db, planRef;
